@@ -50,9 +50,9 @@ func ListProjects(getClient GetClientFn, t translations.TranslationHelperFunc) (
 
 			var url string
 			if ownerType == "organization" {
-				url = fmt.Sprintf("/orgs/%s/projectsV2", owner)
+				url = fmt.Sprintf("orgs/%s/projectsV2", owner)
 			} else {
-				url = fmt.Sprintf("/users/%s/projectsV2", owner)
+				url = fmt.Sprintf("users/%s/projectsV2", owner)
 			}
 			projects := []github.ProjectV2{}
 
@@ -130,7 +130,7 @@ func GetProject(getClient GetClientFn, t translations.TranslationHelperFunc) (to
 			if ownerType == "organization" {
 				url = fmt.Sprintf("orgs/%s/projectsV2/%d", owner, projectNumber)
 			} else {
-				url = fmt.Sprintf("/users/%s/projectsV2/%d", owner, projectNumber)
+				url = fmt.Sprintf("users/%s/projectsV2/%d", owner, projectNumber)
 			}
 
 			projects := []github.ProjectV2{}
