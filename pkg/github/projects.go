@@ -24,8 +24,6 @@ func ListProjects(getClient GetClientFn, t translations.TranslationHelperFunc) (
 			mcp.WithString("owner_type", mcp.Required(), mcp.Description("Owner type"), mcp.Enum("user", "organization")),
 			mcp.WithString("owner", mcp.Required(), mcp.Description("If owner_type == user it is the handle for the GitHub user account. If owner_type == organization it is the name of the organization. The name is not case sensitive.")),
 			mcp.WithString("query", mcp.Description("Filter projects by a search query (matches title and description)")),
-			mcp.WithString("before", mcp.Description("Cursor for items before (backwards pagination)")),
-			mcp.WithString("after", mcp.Description("Cursor for items after (forward pagination)")),
 			mcp.WithNumber("per_page", mcp.Description("Number of results per page (max 100, default: 30)")),
 		), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			owner, err := RequiredParam[string](req, "owner")
@@ -37,15 +35,6 @@ func ListProjects(getClient GetClientFn, t translations.TranslationHelperFunc) (
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			queryStr, err := OptionalParam[string](req, "query")
-			if err != nil {
-				return mcp.NewToolResultError(err.Error()), nil
-			}
-
-			beforeCursor, err := OptionalParam[string](req, "before")
-			if err != nil {
-				return mcp.NewToolResultError(err.Error()), nil
-			}
-			afterCursor, err := OptionalParam[string](req, "after")
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
@@ -68,12 +57,7 @@ func ListProjects(getClient GetClientFn, t translations.TranslationHelperFunc) (
 			projects := []github.ProjectV2{}
 
 			opts := ListProjectsOptions{PerPage: perPage}
-			if afterCursor != "" {
-				opts.After = afterCursor
-			}
-			if beforeCursor != "" {
-				opts.Before = beforeCursor
-			}
+
 			if queryStr != "" {
 				opts.Query = queryStr
 			}
@@ -183,12 +167,6 @@ func GetProject(getClient GetClientFn, t translations.TranslationHelperFunc) (to
 }
 
 type ListProjectsOptions struct {
-	// A cursor, as given in the Link header. If specified, the query only searches for events before this cursor.
-	Before string `url:"before,omitempty"`
-
-	// A cursor, as given in the Link header. If specified, the query only searches for events after this cursor.
-	After string `url:"after,omitempty"`
-
 	// For paginated result sets, the number of results to include per page.
 	PerPage int `url:"per_page,omitempty"`
 

@@ -25,8 +25,6 @@ func Test_ListProjects(t *testing.T) {
 	assert.Contains(t, tool.InputSchema.Properties, "owner")
 	assert.Contains(t, tool.InputSchema.Properties, "owner_type")
 	assert.Contains(t, tool.InputSchema.Properties, "query")
-	assert.Contains(t, tool.InputSchema.Properties, "before")
-	assert.Contains(t, tool.InputSchema.Properties, "after")
 	assert.Contains(t, tool.InputSchema.Properties, "per_page")
 	assert.ElementsMatch(t, tool.InputSchema.Required, []string{"owner", "owner_type"})
 
@@ -80,7 +78,7 @@ func Test_ListProjects(t *testing.T) {
 					http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 						q := r.URL.Query()
 						// Assert query params present
-						if q.Get("after") == "cursor123" && q.Get("per_page") == "50" && q.Get("q") == "roadmap" {
+						if q.Get("per_page") == "50" && q.Get("q") == "roadmap" {
 							w.WriteHeader(http.StatusOK)
 							_, _ = w.Write(mock.MustMarshal(orgProjects))
 							return
@@ -93,7 +91,6 @@ func Test_ListProjects(t *testing.T) {
 			requestArgs: map[string]interface{}{
 				"owner":      "octo-org",
 				"owner_type": "organization",
-				"after":      "cursor123",
 				"per_page":   float64(50),
 				"query":      "roadmap",
 			},

@@ -664,8 +664,6 @@ The following sets of tools are available (all are on by default):
   - `project_number`: The project's number (number, required)
 
 - **list_projects** - List projects
-  - `after`: Cursor for items after (forward pagination) (string, optional)
-  - `before`: Cursor for items before (backwards pagination) (string, optional)
   - `owner`: If owner_type == user it is the handle for the GitHub user account. If owner_type == organization it is the name of the organization. The name is not case sensitive. (string, required)
   - `owner_type`: Owner type (string, required)
   - `per_page`: Number of results per page (max 100, default: 30) (number, optional)
