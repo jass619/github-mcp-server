@@ -113,6 +113,75 @@ func ListProjects(getClient GetClientFn, t translations.TranslationHelperFunc) (
 		}
 }
 
+func GetProject(getClient GetClientFn, t translations.TranslationHelperFunc) (tool mcp.Tool, handler server.ToolHandlerFunc) {
+	return mcp.NewTool("get_project",
+			mcp.WithDescription(t("TOOL_GET_PROJECT_DESCRIPTION", "Get Project for a user or organization")),
+			mcp.WithToolAnnotation(mcp.ToolAnnotation{Title: t("TOOL_GET_PROJECT_USER_TITLE", "Get project"), ReadOnlyHint: ToBoolPtr(true)}),
+			mcp.WithNumber("project_number", mcp.Required(), mcp.Description("The project's number")),
+			mcp.WithString("owner_type", mcp.Required(), mcp.Description("Owner type"), mcp.Enum("user", "organization")),
+			mcp.WithString("owner", mcp.Required(), mcp.Description("If owner_type == user it is the handle for the GitHub user account. If owner_type == organization it is the name of the organization. The name is not case sensitive.")),
+		), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+
+			projectNumber, err := RequiredInt(req, "project_number")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+
+			owner, err := RequiredParam[string](req, "owner")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+
+			ownerType, err := RequiredParam[string](req, "owner_type")
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+
+			client, err := getClient(ctx)
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+
+			var url string
+			if ownerType == "organization" {
+				url = fmt.Sprintf("orgs/%s/projectsV2/%d", owner, projectNumber)
+			} else {
+				url = fmt.Sprintf("/users/%s/projectsV2/%d", owner, projectNumber)
+			}
+
+			projects := []github.ProjectV2{}
+
+			httpRequest, err := client.NewRequest("GET", url, nil)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create request: %w", err)
+			}
+
+			resp, err := client.Do(ctx, httpRequest, &projects)
+			if err != nil {
+				return ghErrors.NewGitHubAPIErrorResponse(ctx,
+					"failed to get project",
+					resp,
+					err,
+				), nil
+			}
+			defer func() { _ = resp.Body.Close() }()
+
+			if resp.StatusCode != http.StatusOK {
+				body, err := io.ReadAll(resp.Body)
+				if err != nil {
+					return nil, fmt.Errorf("failed to read response body: %w", err)
+				}
+				return mcp.NewToolResultError(fmt.Sprintf("failed to get project: %s", string(body))), nil
+			}
+			r, err := json.Marshal(projects)
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal response: %w", err)
+			}
+
+			return mcp.NewToolResultText(string(r)), nil
+		}
+}
+
 type ListProjectsOptions struct {
 	// A cursor, as given in the Link header. If specified, the query only searches for events before this cursor.
 	Before string `url:"before,omitempty"`
