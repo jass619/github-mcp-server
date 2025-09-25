@@ -3,18 +3,18 @@
     "title": "Get project",
     "readOnlyHint": true
   },
-  "description": "Get Project for an user or organization",
+  "description": "Get Project for an user or org",
   "inputSchema": {
     "properties": {
       "owner": {
-        "description": "If owner_type == user it is the handle for the GitHub user account. If owner_type == organization it is the name of the organization. The name is not case sensitive.",
+        "description": "If owner_type == user it is the handle for the GitHub user account. If owner_type == org it is the name of the organization. The name is not case sensitive.",
         "type": "string"
       },
       "owner_type": {
         "description": "Owner type",
         "enum": [
           "user",
-          "organization"
+          "org"
         ],
         "type": "string"
       },

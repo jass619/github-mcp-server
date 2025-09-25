@@ -48,7 +48,7 @@ func Test_ListProjects(t *testing.T) {
 			),
 			requestArgs: map[string]interface{}{
 				"owner":      "octo-org",
-				"owner_type": "organization",
+				"owner_type": "org",
 			},
 			expectError:    false,
 			expectedLength: 1,
@@ -88,7 +88,7 @@ func Test_ListProjects(t *testing.T) {
 			),
 			requestArgs: map[string]interface{}{
 				"owner":      "octo-org",
-				"owner_type": "organization",
+				"owner_type": "org",
 				"per_page":   float64(50),
 				"query":      "roadmap",
 			},
@@ -105,7 +105,7 @@ func Test_ListProjects(t *testing.T) {
 			),
 			requestArgs: map[string]interface{}{
 				"owner":      "octo-org",
-				"owner_type": "organization",
+				"owner_type": "org",
 			},
 			expectError:    true,
 			expectedErrMsg: "failed to list projects",
@@ -114,7 +114,7 @@ func Test_ListProjects(t *testing.T) {
 			name:         "missing owner",
 			mockedClient: mock.NewMockedHTTPClient(),
 			requestArgs: map[string]interface{}{
-				"owner_type": "organization",
+				"owner_type": "org",
 			},
 			expectError: true,
 		},
@@ -194,7 +194,7 @@ func Test_GetProject(t *testing.T) {
 			requestArgs: map[string]interface{}{
 				"project_number": float64(123),
 				"owner":          "octo-org",
-				"owner_type":     "organization",
+				"owner_type":     "org",
 			},
 			expectError: false,
 		},
@@ -224,7 +224,7 @@ func Test_GetProject(t *testing.T) {
 			requestArgs: map[string]interface{}{
 				"project_number": float64(999),
 				"owner":          "octo-org",
-				"owner_type":     "organization",
+				"owner_type":     "org",
 			},
 			expectError:    true,
 			expectedErrMsg: "failed to get project", // updated to match implementation
@@ -234,7 +234,7 @@ func Test_GetProject(t *testing.T) {
 			mockedClient: mock.NewMockedHTTPClient(),
 			requestArgs: map[string]interface{}{
 				"owner":      "octo-org",
-				"owner_type": "organization",
+				"owner_type": "org",
 			},
 			expectError: true,
 		},
@@ -243,7 +243,7 @@ func Test_GetProject(t *testing.T) {
 			mockedClient: mock.NewMockedHTTPClient(),
 			requestArgs: map[string]interface{}{
 				"project_number": float64(123),
-				"owner_type":     "organization",
+				"owner_type":     "org",
 			},
 			expectError: true,
 		},
@@ -289,6 +289,157 @@ func Test_GetProject(t *testing.T) {
 			var arr map[string]any
 			err = json.Unmarshal([]byte(textContent.Text), &arr)
 			require.NoError(t, err)
+		})
+	}
+}
+
+func Test_ListProjectFields(t *testing.T) {
+	// Verify tool definition & schema snapshot
+	mockClient := gh.NewClient(nil)
+	tool, _ := ListProjectFields(stubGetClientFn(mockClient), translations.NullTranslationHelper)
+	require.NoError(t, toolsnaps.Test(tool.Name, tool))
+
+	assert.Equal(t, "list_project_fields", tool.Name)
+	assert.NotEmpty(t, tool.Description)
+	assert.Contains(t, tool.InputSchema.Properties, "owner_type")
+	assert.Contains(t, tool.InputSchema.Properties, "owner")
+	assert.Contains(t, tool.InputSchema.Properties, "projectNumber")
+	assert.Contains(t, tool.InputSchema.Properties, "per_page")
+	assert.ElementsMatch(t, tool.InputSchema.Required, []string{"owner_type", "owner", "projectNumber"})
+
+	// Minimal field objects
+	orgFields := []map[string]any{
+		{"id": 101, "name": "Status", "dataType": "single_select"},
+	}
+	userFields := []map[string]any{
+		{"id": 201, "name": "Priority", "dataType": "single_select"},
+	}
+
+	tests := []struct {
+		name           string
+		mockedClient   *http.Client
+		requestArgs    map[string]interface{}
+		expectError    bool
+		expectedLength int
+		expectedErrMsg string
+	}{
+		{
+			name: "success organization fields",
+			mockedClient: mock.NewMockedHTTPClient(
+				mock.WithRequestMatchHandler(
+					mock.EndpointPattern{Pattern: "/orgs/{org}/projectsV2/{project}/fields", Method: http.MethodGet},
+					mockResponse(t, http.StatusOK, orgFields),
+				),
+			),
+			requestArgs: map[string]interface{}{
+				"owner":         "octo-org",
+				"owner_type":    "org",
+				"projectNumber": "123",
+			},
+			expectedLength: 1,
+		},
+		{
+			name: "success user fields with per_page override",
+			mockedClient: mock.NewMockedHTTPClient(
+				mock.WithRequestMatchHandler(
+					mock.EndpointPattern{Pattern: "/users/{user}/projectsV2/{project}/fields", Method: http.MethodGet},
+					http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+						q := r.URL.Query()
+						if q.Get("per_page") == "50" {
+							w.WriteHeader(http.StatusOK)
+							_, _ = w.Write(mock.MustMarshal(userFields))
+							return
+						}
+						w.WriteHeader(http.StatusBadRequest)
+						_, _ = w.Write([]byte(`{"message":"unexpected query params"}`))
+					}),
+				),
+			),
+			requestArgs: map[string]interface{}{
+				"owner":         "octocat",
+				"owner_type":    "user",
+				"projectNumber": "456",
+				"per_page":      float64(50),
+			},
+			expectedLength: 1,
+		},
+		{
+			name: "api error",
+			mockedClient: mock.NewMockedHTTPClient(
+				mock.WithRequestMatchHandler(
+					mock.EndpointPattern{Pattern: "/orgs/{org}/projectsV2/{project}/fields", Method: http.MethodGet},
+					mockResponse(t, http.StatusInternalServerError, map[string]string{"message": "boom"}),
+				),
+			),
+			requestArgs: map[string]interface{}{
+				"owner":         "octo-org",
+				"owner_type":    "org",
+				"projectNumber": "789",
+			},
+			expectError:    true,
+			expectedErrMsg: "failed to list projects",
+		},
+		{
+			name:         "missing owner",
+			mockedClient: mock.NewMockedHTTPClient(),
+			requestArgs: map[string]interface{}{
+				"owner_type":    "org",
+				"projectNumber": "10",
+			},
+			expectError: true,
+		},
+		{
+			name:         "missing owner_type",
+			mockedClient: mock.NewMockedHTTPClient(),
+			requestArgs: map[string]interface{}{
+				"owner":         "octo-org",
+				"projectNumber": "10",
+			},
+			expectError: true,
+		},
+		{
+			name:         "missing projectNumber",
+			mockedClient: mock.NewMockedHTTPClient(),
+			requestArgs: map[string]interface{}{
+				"owner":      "octo-org",
+				"owner_type": "org",
+			},
+			expectError: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			client := gh.NewClient(tc.mockedClient)
+			_, handler := ListProjectFields(stubGetClientFn(client), translations.NullTranslationHelper)
+			request := createMCPRequest(tc.requestArgs)
+			result, err := handler(context.Background(), request)
+
+			require.NoError(t, err)
+			if tc.expectError {
+				require.True(t, result.IsError)
+				text := getTextResult(t, result).Text
+				if tc.expectedErrMsg != "" {
+					assert.Contains(t, text, tc.expectedErrMsg)
+				}
+				if tc.name == "missing owner" {
+					assert.Contains(t, text, "missing required parameter: owner")
+				}
+				if tc.name == "missing owner_type" {
+					assert.Contains(t, text, "missing required parameter: owner_type")
+				}
+				if tc.name == "missing projectNumber" {
+					assert.Contains(t, text, "missing required parameter: projectNumber")
+				}
+				return
+			}
+
+			require.False(t, result.IsError)
+			textContent := getTextResult(t, result)
+			var fields []map[string]any
+			err = json.Unmarshal([]byte(textContent.Text), &fields)
+			require.NoError(t, err)
+			assert.Equal(t, tc.expectedLength, len(fields))
 		})
 	}
 }
