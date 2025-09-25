@@ -15,7 +15,6 @@ import (
 )
 
 func Test_ListProjects(t *testing.T) {
-	// Verify tool definition and schema once
 	mockClient := gh.NewClient(nil)
 	tool, _ := ListProjects(stubGetClientFn(mockClient), translations.NullTranslationHelper)
 	require.NoError(t, toolsnaps.Test(tool.Name, tool))
@@ -28,7 +27,6 @@ func Test_ListProjects(t *testing.T) {
 	assert.Contains(t, tool.InputSchema.Properties, "per_page")
 	assert.ElementsMatch(t, tool.InputSchema.Required, []string{"owner", "owner_type"})
 
-	// Minimal project objects (fields chosen to likely exist on ProjectV2; test only asserts round-trip JSON array length)
 	orgProjects := []map[string]any{{"id": 1, "title": "Org Project"}}
 	userProjects := []map[string]any{{"id": 2, "title": "User Project"}}
 
@@ -176,15 +174,13 @@ func Test_GetProject(t *testing.T) {
 	assert.Contains(t, tool.InputSchema.Properties, "owner_type")
 	assert.ElementsMatch(t, tool.InputSchema.Required, []string{"project_number", "owner", "owner_type"})
 
-	// Minimal project object for response array
-	project := []map[string]any{{"id": 123, "title": "Project Title"}}
+	project := map[string]any{"id": 123, "title": "Project Title"}
 
 	tests := []struct {
 		name           string
 		mockedClient   *http.Client
 		requestArgs    map[string]interface{}
 		expectError    bool
-		expectedLength int
 		expectedErrMsg string
 	}{
 		{
@@ -200,8 +196,7 @@ func Test_GetProject(t *testing.T) {
 				"owner":          "octo-org",
 				"owner_type":     "organization",
 			},
-			expectError:    false,
-			expectedLength: 1,
+			expectError: false,
 		},
 		{
 			name: "success user project fetch",
@@ -216,8 +211,7 @@ func Test_GetProject(t *testing.T) {
 				"owner":          "octocat",
 				"owner_type":     "user",
 			},
-			expectError:    false,
-			expectedLength: 1,
+			expectError: false,
 		},
 		{
 			name: "api error",
@@ -292,10 +286,9 @@ func Test_GetProject(t *testing.T) {
 
 			require.False(t, result.IsError)
 			textContent := getTextResult(t, result)
-			var arr []map[string]any
+			var arr map[string]any
 			err = json.Unmarshal([]byte(textContent.Text), &arr)
 			require.NoError(t, err)
-			assert.Equal(t, tc.expectedLength, len(arr))
 		})
 	}
 }

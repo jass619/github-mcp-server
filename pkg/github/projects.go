@@ -42,7 +42,6 @@ func ListProjects(getClient GetClientFn, t translations.TranslationHelperFunc) (
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
-
 			client, err := getClient(ctx)
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
@@ -56,10 +55,13 @@ func ListProjects(getClient GetClientFn, t translations.TranslationHelperFunc) (
 			}
 			projects := []github.ProjectV2{}
 
-			opts := ListProjectsOptions{PerPage: perPage}
+			opts := listProjectsOptions{PerPage: perPage}
 
 			if queryStr != "" {
 				opts.Query = queryStr
+			}
+			if perPage > 0 {
+				opts.PerPage = perPage
 			}
 			url, err = addOptions(url, opts)
 			if err != nil {
@@ -99,7 +101,7 @@ func ListProjects(getClient GetClientFn, t translations.TranslationHelperFunc) (
 
 func GetProject(getClient GetClientFn, t translations.TranslationHelperFunc) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("get_project",
-			mcp.WithDescription(t("TOOL_GET_PROJECT_DESCRIPTION", "Get Project for a user or organization")),
+			mcp.WithDescription(t("TOOL_GET_PROJECT_DESCRIPTION", "Get Project for an user or organization")),
 			mcp.WithToolAnnotation(mcp.ToolAnnotation{Title: t("TOOL_GET_PROJECT_USER_TITLE", "Get project"), ReadOnlyHint: ToBoolPtr(true)}),
 			mcp.WithNumber("project_number", mcp.Required(), mcp.Description("The project's number")),
 			mcp.WithString("owner_type", mcp.Required(), mcp.Description("Owner type"), mcp.Enum("user", "organization")),
@@ -133,14 +135,14 @@ func GetProject(getClient GetClientFn, t translations.TranslationHelperFunc) (to
 				url = fmt.Sprintf("users/%s/projectsV2/%d", owner, projectNumber)
 			}
 
-			projects := []github.ProjectV2{}
+			project := github.ProjectV2{}
 
 			httpRequest, err := client.NewRequest("GET", url, nil)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create request: %w", err)
 			}
 
-			resp, err := client.Do(ctx, httpRequest, &projects)
+			resp, err := client.Do(ctx, httpRequest, &project)
 			if err != nil {
 				return ghErrors.NewGitHubAPIErrorResponse(ctx,
 					"failed to get project",
@@ -157,7 +159,7 @@ func GetProject(getClient GetClientFn, t translations.TranslationHelperFunc) (to
 				}
 				return mcp.NewToolResultError(fmt.Sprintf("failed to get project: %s", string(body))), nil
 			}
-			r, err := json.Marshal(projects)
+			r, err := json.Marshal(project)
 			if err != nil {
 				return nil, fmt.Errorf("failed to marshal response: %w", err)
 			}
@@ -166,7 +168,7 @@ func GetProject(getClient GetClientFn, t translations.TranslationHelperFunc) (to
 		}
 }
 
-type ListProjectsOptions struct {
+type listProjectsOptions struct {
 	// For paginated result sets, the number of results to include per page.
 	PerPage int `url:"per_page,omitempty"`
 
